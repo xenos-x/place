@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>JS Bin</title>
+<style id="jsbin-css">
+html {
+  font-family: sans-serif;
+  background: white;
+}
+
+.canvascontainer {
+  text-align: center;
+}
+
+.time {
+  border: 1px solid black;
+  padding: 0px 10px;
+  background: rgba(100, 100, 100, 0.8);
+  color: white;
+  font-size: 40px;
+  text-align: center;
+  position: absolute;
+  top: 50px;
+  left: 200px;
+  opacity: 1;
+  display: none;
+}
+
+#canvas {
+  border: 2px solid black;
+}
+
+.colorbar {
+  padding: 0px;
+  padding: 4px 4px 0px 4px;
+  display: inline-block;
+}
+
+.color {
+  background: black;
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  border: 1px solid black;
+  margin: -2.3px -3px;
+}
+
+.c0 {
+  background: #FFFFFF;
+}
+
+.c1 {
+  background: #E4E4E4;
+}
+
+.c2 {
+  background: #888888;
+}
+
+.c3 {
+  background: #222222;
+}
+
+.c4 {
+  background: #FFA7D1;
+}
+
+.c5 {
+  background: #E50100;
+}
+
+.c6 {
+  background: #E59500;
+}
+
+.c7 {
+  background: #9F6A42;
+}
+
+.c8 {
+  background: #E6D900;
+}
+
+.c9 {
+  background: #94E145;
+}
+
+.c10 {
+  background: #01BE00;
+}
+
+.c11 {
+  background: #00D3DE;
+}
+
+.c12 {
+  background: #0082C6;
+}
+
+.c13 {
+  background: #0000EA;
+}
+
+.c14 {
+  background: #CF6DE4;
+}
+
+.c15 {
+  background: #820180;
+}
+</style>
+</head>
+<body>
+  
+  <div class='time' id='time'>0:00</div>
+  <div class='canvascontainer'>
+    <canvas id='canvas' width='500' height='500'></canvas>
+    <br />
+    <div class='colorbar'>
+      <span class='color c0' onclick='currentColor=0'></span>
+      <span class='color c1' onclick='currentColor=1'></span>
+      <span class='color c2' onclick='currentColor=2'></span>
+      <span class='color c3' onclick='currentColor=3'></span>
+      <span class='color c4' onclick='currentColor=4'></span>
+      <span class='color c5' onclick='currentColor=5'></span>
+      <span class='color c6' onclick='currentColor=6'></span>
+      <span class='color c7' onclick='currentColor=7'></span>
+      <span class='color c8' onclick='currentColor=8'></span>
+      <span class='color c9' onclick='currentColor=9'></span>
+      <span class='color c10' onclick='currentColor=10'></span>
+      <span class='color c11' onclick='currentColor=11'></span>
+      <span class='color c12' onclick='currentColor=12'></span>
+      <span class='color c13' onclick='currentColor=13'></span>
+      <span class='color c14' onclick='currentColor=14'></span>
+      <span class='color c15' onclick='currentColor=15'></span>
+    </div>
+  </div>
+  
+<script id="jsbin-javascript">
+var ws = new WebSocket("ws://107.173.43.102:8001");
+var c=document.getElementById("canvas");
+var ctx=c.getContext("2d");
+
+var loaded = false;
+var mouse = {"x":0, "y":0};
+var lastOutline = {"x":0, "y":0};
+
+var currentColor = 3;
+var time = 1;
+var shouldTimerShow = false;
+
+
+ws.onmessage = function(data) {
+  data = JSON.parse(data.data);
+  
+  if (data.type == "serverpixellist") {
+    data.list.forEach(function(pxl) {
+      drawPixel(pxl.color, pxl.x, pxl.y);
+    });
+    loaded = true;
+  }
+  
+  if (loaded) {
+      if (data.type == "serverpixel") {
+        drawPixel(data.color, data.x, data.y);
+      }
+    
+      if (data.type == "time") {
+        time = data.time;
+        setTime(m2s(time - Date.now()));
+        console.log("Time recieved: " + data.time);
+        if ((time - Date.now()) > 0) {
+          setTime(m2s(time - Date.now()));
+          showTime();
+          shouldTimerShow = true;
+        }
+      }
+    
+  }
+}
+
+ws.onerror= function() {
+  console.log("oh shit problem PROBLEM");
+}
+
+function setTime(timeset) {
+  document.getElementById("time").innerHTML = timeset;
+}
+
+function hideTime() {
+  document.getElementById("time").style.display = "none";
+}
+
+function showTime() {
+  document.getElementById("time").style.display = "inline";
+}
+
+function requestTime() {
+  ws.send(JSON.stringify({
+    "type":"clienttimerequest"
+  }));
+}
+
+function cc(color) {
+  currentColor = color;
+}
+
+function sendPixel(color, x, y) {
+  ws.send(JSON.stringify({
+    "type":"clientpixel",
+    "color":color,
+    "x":x,
+    "y":y
+  }));
+}
+
+function drawPixel(color, x, y) {
+  x = Math.floor(x/10);
+  y = Math.floor(y/10);
+  ctx.fillStyle="#" + colorToHex(color);
+  ctx.fillRect(x*10, y*10, 10, 10);
+}
+
+function drawOutline(x, y) {
+  var lastx = Math.floor(lastOutline.x/10)*10;
+  var lasty = Math.floor(lastOutline.y/10)*10;
+  ctx.clearRect(lastx-1, lasty-1, 12, 12);
+  x = Math.floor(x/10)*10;
+  y = Math.floor(y/10)*10;
+  ctx.beginPath();
+  ctx.lineWidth="2";
+  ctx.strokeStyle="black";
+  ctx.rect(x, y, 10, 10);
+  ctx.stroke();
+  lastOutline.x = x;
+  lastOutline.y = y;
+}
+
+function clearRequest(password) {
+  ws.send(JSON.stringify({
+    "type":"clearrequest",
+    "pass":password
+  }));
+}
+
+function bypass(password) {
+  ws.send(JSON.stringify({
+    "type":"clientbypassrequest",
+    "pass":password
+  }));
+}
+
+function colorToHex(color) {
+  var hex;
+  if (color === 0) hex = 'FFFFFF';
+  if (color === 1) hex = 'E4E4E4';
+  if (color === 2) hex = '888888';
+  if (color === 3) hex = '222222';
+  if (color === 4) hex = 'FFA7D1';
+  if (color === 5) hex = 'E50100';
+  if (color === 6) hex = 'E59500';
+  if (color === 7) hex = '9F6A42';
+  if (color === 8) hex = 'E6D900';
+  if (color === 9) hex = '94E145';
+  if (color === 10) hex = '01BE00';
+  if (color === 11) hex = '00D3DE';
+  if (color === 12) hex = '0082C6';
+  if (color === 13) hex = '0000EA';
+  if (color === 14) hex = 'CF6DE4';
+  if (color === 15) hex = '820180';
+  return hex;
+}
+
+function getMousePos(canvas, evt) {
+  var rect = canvas.getBoundingClientRect();
+  return {
+    x: Math.round((evt.clientX-rect.left)/(rect.right-rect.left)*canvas.width),
+    y: Math.round((evt.clientY-rect.top)/(rect.bottom-rect.top)*canvas.height)
+  };
+}
+
+function m2s(millis) {
+  var minutes = Math.floor(millis / 60000);
+  var seconds = ((millis % 60000) / 1000).toFixed(0);
+  return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
+}
+
+
+c.addEventListener('mousemove', function(event) {
+  mouse = getMousePos(c, event);
+  //drawOutline(mouse.x, mouse.y);
+});
+
+c.addEventListener('mousedown', function(event) {
+  //console.log(getMousePos(c, event));
+  mouse = getMousePos(c, event);
+  console.log("click! Pixel placed at " + mouse.x + ", " + mouse.y);
+  sendPixel(currentColor, mouse.x, mouse.y);
+  //requestTime();
+  setTime(m2s(time - Date.now()));
+  if ((time - Date.now()) > 0) {
+    setTime(m2s(time - Date.now()));
+    showTime();
+    shouldTimerShow = true;
+  }
+});
+
+var waitForLoad = setInterval(function() {
+  if (loaded) {
+    console.log("Loading complete!");
+    whenLoaded();
+    clearInterval(waitForLoad);
+  }
+}, 100);
+
+function whenLoaded() {
+  
+  requestTime();
+  
+    setInterval(function() {
+      if ((time - Date.now()) > 0) {
+         setTime(m2s(time - Date.now()));
+      } else {
+        hideTime();
+      }
+    }, 1000);
+  
+}
+</script>
+
+
+<script id="jsbin-source-css" type="text/css">html {
+  font-family: sans-serif;
+  background: white;
+}
+
+.canvascontainer {
+  text-align: center;
+}
+
+.time {
+  border: 1px solid black;
+  padding: 0px 10px;
+  background: rgba(100, 100, 100, 0.8);
+  color: white;
+  font-size: 40px;
+  text-align: center;
+  position: absolute;
+  top: 50px;
+  left: 200px;
+  opacity: 1;
+  display: none;
+}
+
+#canvas {
+  border: 2px solid black;
+}
+
+.colorbar {
+  padding: 0px;
+  padding: 4px 4px 0px 4px;
+  display: inline-block;
+}
+
+.color {
+  background: black;
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  border: 1px solid black;
+  margin: -2.3px -3px;
+}
+
+.c0 {
+  background: #FFFFFF;
+}
+
+.c1 {
+  background: #E4E4E4;
+}
+
+.c2 {
+  background: #888888;
+}
+
+.c3 {
+  background: #222222;
+}
+
+.c4 {
+  background: #FFA7D1;
+}
+
+.c5 {
+  background: #E50100;
+}
+
+.c6 {
+  background: #E59500;
+}
+
+.c7 {
+  background: #9F6A42;
+}
+
+.c8 {
+  background: #E6D900;
+}
+
+.c9 {
+  background: #94E145;
+}
+
+.c10 {
+  background: #01BE00;
+}
+
+.c11 {
+  background: #00D3DE;
+}
+
+.c12 {
+  background: #0082C6;
+}
+
+.c13 {
+  background: #0000EA;
+}
+
+.c14 {
+  background: #CF6DE4;
+}
+
+.c15 {
+  background: #820180;
+}
+</script>
+
+<script id="jsbin-source-javascript" type="text/javascript">var ws = new WebSocket("ws://107.173.43.102:8001");
+var c=document.getElementById("canvas");
+var ctx=c.getContext("2d");
+
+var loaded = false;
+var mouse = {"x":0, "y":0};
+var lastOutline = {"x":0, "y":0};
+
+var currentColor = 3;
+var time = 1;
+var shouldTimerShow = false;
+
+
+ws.onmessage = function(data) {
+  data = JSON.parse(data.data);
+  
+  if (data.type == "serverpixellist") {
+    data.list.forEach(function(pxl) {
+      drawPixel(pxl.color, pxl.x, pxl.y);
+    });
+    loaded = true;
+  }
+  
+  if (loaded) {
+      if (data.type == "serverpixel") {
+        drawPixel(data.color, data.x, data.y);
+      }
+    
+      if (data.type == "time") {
+        time = data.time;
+        setTime(m2s(time - Date.now()));
+        console.log("Time recieved: " + data.time);
+        if ((time - Date.now()) > 0) {
+          setTime(m2s(time - Date.now()));
+          showTime();
+          shouldTimerShow = true;
+        }
+      }
+    
+  }
+}
+
+ws.onerror= function() {
+  console.log("oh shit problem PROBLEM");
+}
+
+function setTime(timeset) {
+  document.getElementById("time").innerHTML = timeset;
+}
+
+function hideTime() {
+  document.getElementById("time").style.display = "none";
+}
+
+function showTime() {
+  document.getElementById("time").style.display = "inline";
+}
+
+function requestTime() {
+  ws.send(JSON.stringify({
+    "type":"clienttimerequest"
+  }));
+}
+
+function cc(color) {
+  currentColor = color;
+}
+
+function sendPixel(color, x, y) {
+  ws.send(JSON.stringify({
+    "type":"clientpixel",
+    "color":color,
+    "x":x,
+    "y":y
+  }));
+}
+
+function drawPixel(color, x, y) {
+  x = Math.floor(x/10);
+  y = Math.floor(y/10);
+  ctx.fillStyle="#" + colorToHex(color);
+  ctx.fillRect(x*10, y*10, 10, 10);
+}
+
+function drawOutline(x, y) {
+  var lastx = Math.floor(lastOutline.x/10)*10;
+  var lasty = Math.floor(lastOutline.y/10)*10;
+  ctx.clearRect(lastx-1, lasty-1, 12, 12);
+  x = Math.floor(x/10)*10;
+  y = Math.floor(y/10)*10;
+  ctx.beginPath();
+  ctx.lineWidth="2";
+  ctx.strokeStyle="black";
+  ctx.rect(x, y, 10, 10);
+  ctx.stroke();
+  lastOutline.x = x;
+  lastOutline.y = y;
+}
+
+function clearRequest(password) {
+  ws.send(JSON.stringify({
+    "type":"clearrequest",
+    "pass":password
+  }));
+}
+
+function bypass(password) {
+  ws.send(JSON.stringify({
+    "type":"clientbypassrequest",
+    "pass":password
+  }));
+}
+
+function colorToHex(color) {
+  var hex;
+  if (color === 0) hex = 'FFFFFF';
+  if (color === 1) hex = 'E4E4E4';
+  if (color === 2) hex = '888888';
+  if (color === 3) hex = '222222';
+  if (color === 4) hex = 'FFA7D1';
+  if (color === 5) hex = 'E50100';
+  if (color === 6) hex = 'E59500';
+  if (color === 7) hex = '9F6A42';
+  if (color === 8) hex = 'E6D900';
+  if (color === 9) hex = '94E145';
+  if (color === 10) hex = '01BE00';
+  if (color === 11) hex = '00D3DE';
+  if (color === 12) hex = '0082C6';
+  if (color === 13) hex = '0000EA';
+  if (color === 14) hex = 'CF6DE4';
+  if (color === 15) hex = '820180';
+  return hex;
+}
+
+function getMousePos(canvas, evt) {
+  var rect = canvas.getBoundingClientRect();
+  return {
+    x: Math.round((evt.clientX-rect.left)/(rect.right-rect.left)*canvas.width),
+    y: Math.round((evt.clientY-rect.top)/(rect.bottom-rect.top)*canvas.height)
+  };
+}
+
+function m2s(millis) {
+  var minutes = Math.floor(millis / 60000);
+  var seconds = ((millis % 60000) / 1000).toFixed(0);
+  return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
+}
+
+
+c.addEventListener('mousemove', function(event) {
+  mouse = getMousePos(c, event);
+  //drawOutline(mouse.x, mouse.y);
+});
+
+c.addEventListener('mousedown', function(event) {
+  //console.log(getMousePos(c, event));
+  mouse = getMousePos(c, event);
+  console.log("click! Pixel placed at " + mouse.x + ", " + mouse.y);
+  sendPixel(currentColor, mouse.x, mouse.y);
+  //requestTime();
+  setTime(m2s(time - Date.now()));
+  if ((time - Date.now()) > 0) {
+    setTime(m2s(time - Date.now()));
+    showTime();
+    shouldTimerShow = true;
+  }
+});
+
+var waitForLoad = setInterval(function() {
+  if (loaded) {
+    console.log("Loading complete!");
+    whenLoaded();
+    clearInterval(waitForLoad);
+  }
+}, 100);
+
+function whenLoaded() {
+  
+  requestTime();
+  
+    setInterval(function() {
+      if ((time - Date.now()) > 0) {
+         setTime(m2s(time - Date.now()));
+      } else {
+        hideTime();
+      }
+    }, 1000);
+  
+}</script></body>
+</html>
